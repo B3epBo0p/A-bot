@@ -182,11 +182,16 @@ commandTree = [
 					}
 			}));
 			const edic = {
-				"pís": "📜",
+				"test": "📜",
 				"proj": "🌐",
 				"hw": "🥨"
 			};
 			const embed = new Ds.MessageEmbed().setTitle(all?"All assignments":"Your assignments:");
+			console.log(result.subjects[0].tasks);
+			console.log("--------\nthe -a tag decides between");
+			console.log(result.subjects.map(x=>x.tasks));
+			console.log("and");
+			console.log(result.subjects.filter(val=>preliminary.map(x=>String(x)).includes(String(val._id))).map(x=>x.tasks));
 			for(const ob of all?result.subjects:result.subjects.filter(val=>preliminary.map(x=>String(x)).includes(String(val._id)))){
 				console.log(ob.name);
 				eqS = "".padStart(10,"-");
@@ -194,7 +199,8 @@ commandTree = [
 				for(const task of ob.tasks){
 					console.log(task);
 					//embed.addField(task.dateObj.toLocaleDateString(),task.dscr, true);
-					embed.addField(`${task.dateObj.getDate()}.${task.dateObj.getMonth()+1} ${edic[task.type]}`,`${task.dscr}${args.flags.includes("-d")?`\n(${task._id})`:""}`, true);//_id only in debug mode
+					console.log(task.dscr);
+					embed.addField(`${task.dateObj.getDate()}.${task.dateObj.getMonth()+1} ${edic[task.type]}`,`${task.dscr} ${args.flags.includes("-d")?"\n("+task._id+")":""}`, true);//_id only in debug mode
 				}
 			}
 			/*console.log(ams);
@@ -235,20 +241,18 @@ commandTree = [
 	{
 		command:"rm",//subject argument technically unnecessary
 		cb: async function(msg,args){
-			await mm.maindb.collection("servers").updateOne({
+			console.log(args);
+			if((await mm.maindb.collection("servers").updateOne({
 				_id: msg.guild.id
 			},
 			{
 				$pull:{
-					"subjects.$[nameLookup].tasks":{
-						_id: args.mongoId//mm.oid()
+					"subjects.$[].tasks":{
+						_id: mm.oid(args.mongoId)
 					}
 				}
-			},
-			{
-				arrayFilters:[{"nameLookup": {"name": args.name}}]
-			});
-			return [msg.reply("Successfully removed.")];
+			})).modifiedCount) return [msg.reply("Successfully removed.")];
+			else return[msg.reply("Something went wrong")];
 		},
 		help:{
 			dscr:"Removes a task specified by an id.\nNote: The bot scans for tasks that are no longer needed every 24 hours, you don't have to remove old tasks manually.",
@@ -281,7 +285,7 @@ commandTree = [
 		command: "src",
 		cb: function(msg,args){
 			console.log("\tReplying to src.");
-			return [msg.reply("The source code for this bot can be found here: https://repl.it/@B33pBoop/a-bot-mongo-implementation#index.js")];
+			return [msg.reply("The source code for this bot can be found here: <https://github.com/B3epBo0p/A-bot>")];
 		},
 		help: {
 			dscr:"Replies with the source code to this bot.",
@@ -292,24 +296,7 @@ commandTree = [
 	{
 		command: "help",
 		cb: function(msg,args){
-			const embed = new Ds.MessageEmbed().setTitle("Help menu."),
-			flags = {"-p":"Commands called with this flag, and responses to them won't be deleted.",
-			"-d":"Requests a detailed response from command (for instance task ids, which can later be used to modify said tasks)."};
-			/*for(const cObj of commandTree){
-				embed.addField(cObj.command, cObj.help, false);
-			} */
-			/*for(const obj of commandTree.reduce((ar,cv,i)=>ar.concat([cv,flags[i]]),[])){
-				embed.addField(obj.command, obj.help, false);
-			}*/
-			/*for(const cObj of commandTree.entries()){
-				const key = Object.keys(flags)[cObj[0]];
-				//console.log(key);
-				embed.addField(cObj[1].command, cObj[1].help, key);
-				if(key)embed.addField(key, Object.values(flags)[cObj[0]], key);
-			}*/
-			embed.addField("Commands", commandTree.reduce((ac,cv,i)=>ac+=`**${(str=>str.charAt(0).toUpperCase()+str.slice(1))(cv.command)}**\n${cv.help.dscr}\n\`${cv.help.syntax}\`\n\`${cv.help.ex}\`\n\n`,""),true);
-			embed.addField("Flags", Object.keys(flags).reduce((ac,cv,i)=>ac+=`${cv}\n${flags[cv]}\n\n`,""), true);
-			return [msg.reply(embed)];
+			return [msg.reply("All available commands can be found here: <https://github.com/B3epBo0p/A-bot/blob/main/README.md#commands>")];
 		},
 		help: {
 			dscr:"Displays this menu.",
@@ -362,7 +349,7 @@ em.on("mongoLoaded", ()=>{
 			console.log(msg.content.split(" ")[0]);
 			console.log(commandTree.map(x=>x.command));*/
 			for(const cObj of commandTree) if(msg.content.split(" ")[0] == cObj.command){
-				if((!cObj.reqReg) || (cObj.reqReg && isRegistered(msg))){
+				if((!cObj.reqReg) || (cObj.reqReg && await isRegistered(msg))){
 					msg.content = msg.content.replace(new RegExp(`${cObj.command}\\s*`), "");
 					console.log(msg.content);
 					//
@@ -379,7 +366,7 @@ em.on("mongoLoaded", ()=>{
 						for(const part of msg.content.split('"').entries()){
 							if(!(part[0]%2)){//is command
 								//console.log("command");
-								if(part[1].includes("pís")) fObj.type = "pís";
+								if(part[1].includes("test")) fObj.type = "test";
 								else if(part[1].includes("proj")) fObj.type = "proj";//continue
 								for(const arg of queries.entries()){
 									console.log("lopp start");
