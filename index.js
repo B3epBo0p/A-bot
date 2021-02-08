@@ -263,25 +263,6 @@ commandTree = [
 		reqReg:true
 	},
 	{
-		command: "purge",
-		cb: function(msg,args){
-			if(msg.author.id == msg.guild.ownerID){
-				db.list().then(keys =>{
-					for(const key of keys){
-						console.log(`deleting entry ${key}`);
-						db.delete(key);
-					}
-				});
-				msg.reply("purging database");
-			}
-			else msg.reply("Insufficient permissions.");
-
-		},
-		help: {
-			dscr: "Clears database."
-		}
-	},
-	{
 		command: "src",
 		cb: function(msg,args){
 			console.log("\tReplying to src.");
@@ -300,21 +281,6 @@ commandTree = [
 		},
 		help: {
 			dscr:"Displays this menu.",
-			syntax:"",
-			ex:""//removable
-		}
-	},
-	{
-		command: "test",
-		cb: function(msg,args){
-			const embed = new Ds.MessageEmbed()
-			.setTitle("Okay");
-			embed.addField("This", "Should work");
-			embed.setColor("#FFFFFF");
-			msg.reply(embed);
-		},	
-		help: {
-			dscr:"For testing purposes only.",
 			syntax:"",
 			ex:""//removable
 		}
@@ -431,7 +397,7 @@ em.on("mongoLoaded", ()=>{
 });
 async function isRegistered(msg){//untested
 	if(!await mm.maindb.collection("users").findOne({_id:msg.author.id})){
-		msg.reply("Hello, it seems that you haven't agreed to our Terms of Service and Privacy Policy yet. You can do so by reading them here https://bit.ly/3nC06gH, and typing 'I have read and understood the above specified Terms of Service and Privacy Policy'.");
+		msg.reply("Hello, it seems that you haven't agreed to our Terms of Service and Privacy Policy yet. You can do so by reading them here <https://bit.ly/3nC06gH>, and typing 'I have read and understood the above specified Terms of Service and Privacy Policy'.");
 		const msgc = await msg.channel.awaitMessages(x=>x.author.id==msg.author.id && x.content === 'I have read and understood the above specified Terms of Service and Privacy Policy',{max:1,time:10000,errors:["time"]});
 		if(msgc.first()){
 			console.log("first fired");
