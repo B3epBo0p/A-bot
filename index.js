@@ -127,30 +127,6 @@ commandTree = [
 		reqReg:true
 	},
 	{
-		command: "init",
-		cb: function(msg,args){
-			mm.db.db("freq_access").collection("servers").insertOne({
-				_id: msg.guild.id,
-				owner: msg.guild.ownerID,
-				joinTime: msg.guild.joinedTimestamp,
-				initTime: msg.createdTimestamp,
-				subjects: [],
-				users: []
-			},(er,res)=>{
-				if (er){
-					if (er.message.includes("duplicate key")) msg.reply("This server has already been initiated.");
-					else throw er;
-				}
-				else msg.reply("Server successfully initiated.");
-			});
-		},
-		help:{
-			dscr:"Used to initialize the server document. One of the first commands you will use.",
-			syntax:"",//removable?
-			ex:""
-		}
-	},
-	{
 		command: "list",
 		cb: async function(msg,args){//_should do that in Maine_ did that in Maine
 			const ams = [],
@@ -391,7 +367,36 @@ em.on("mongoLoaded", ()=>{
 			if(!fired) console.log("Unknown command.");
 		}();
 		//console.log("Exiting event handler.")
-	})
+	});
+	clint.on("guildCreate", function(guild){
+		console.log(`Created guild document entry ${guild.id}`);
+		mm.db.db("freq_access").collection("servers").insertOne({
+				_id: guild.id,
+				owner: guild.ownerID,
+				joinTime: guild.joinedTimestamp,
+				subjects: [],
+				users: []
+			},(er,res)=>{
+				if (er){
+					if (er.message.includes("duplicate key")) console.log("the server has already been initiated");
+					else throw er;
+				}
+				else console.log("Server successfully initiated.");
+		});
+	});
+	clint.on("guildDelete", async function(guild){
+		console.log(guild.id);
+		try{
+			await mm.db.db("freq_access").collection("servers").deleteOne({
+				_id: guild.id
+			});
+		}
+		catch(e){
+			if(e) throw e;
+			else console.log(`${guild.id} successfully deleted`);
+		}
+
+	});
 
 	clint.login(process.env.TOKEN);
 });
