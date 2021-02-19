@@ -70,7 +70,6 @@ commandTree = [
 					{
 						$push:{
 							subjects: {
-								_id: mm.oid(),
 								name: fObj.subject,
 								tasks: [
 									insertFormat
@@ -105,7 +104,7 @@ commandTree = [
 	{
 		command: "sub",
 		cb: async function(msg,args){ 
-			subber(msg,"$addToSet", "Successfully subscribed to subject.");
+			return subber(args.subject,msg,"$addToSet", "Successfully subscribed to subject.");
 		},
 		help:{
 			dscr: "Subscribes user to a subject of their choosing.",
@@ -117,7 +116,7 @@ commandTree = [
 	{
 		command: "desub",
 		cb: function(msg,args){
-			subber(msg,"$pull", "Successfully unsubscribed from subject.");
+			return  subber(args.subject,msg,"$pull", "Successfully unsubscribed from subject.");
 		},
 		help: {
 			dscr: "Unsubscribes user from a particular subject.",
@@ -130,45 +129,63 @@ commandTree = [
 		command: "list",
 		cb: async function(msg,args){//_should do that in Maine_ did that in Maine
 			const ams = [],
-			all = args.flags.includes("-a");
-			const preliminary = (await mm.maindb.collection("users").findOne({
-					_id:msg.author.id
-				},
-				{
-					projection:{
-						subjects: 1,
-						_id: 0
+			all = args.flags.includes("-a")
+			query = await mm.maindb.collection("servers").findOne({
+				_id:msg.guild.id
+			},
+			{
+				projection:{
+					"_id":0,
+					"users":{
+						$elemMatch:{
+							"_id": msg.author.id
+						}
 					}
-				})).subjects;
-			//console.log(preliminary);
-			const result = (await mm.maindb.collection("servers").findOne({
-					_id:msg.guild.id
-				},
-				{
-					projection:{
-						_id:0,
-						subjects:1/*,
-						subjects:{
-							$elemMatch:{
-								_id:{
-									$in: preliminary
-								}
-							}
-						}*/
-					}
-			}));
-			const edic = {
+				}
+			}),
+			edic = {
 				"test": "📜",
 				"proj": "🌐",
 				"hw": "🥨"
-			};
-			const embed = new Ds.MessageEmbed().setTitle(all?"All assignments":"Your assignments:");
-			console.log(result.subjects[0].tasks);
+			},
+			taskQuery = await mm.maindb.collection("servers").findOne({
+				_id:msg.guild.id
+			},
+			{
+				projection:{
+					"_id":0,
+					"subjects":{
+						$elemMatch:{
+							"name":{
+								$in:query.users[0].subjects
+							}
+						}
+					}
+				}
+			})
+			embed = new Ds.MessageEmbed().setTitle(all?"All assignments":"Your assignments:");
+			/*console.log(query);
+			console.log(query.users);
+			console.log(query.users[0]);
+			console.log(query.users[0].subjects);*/
+			for(const ob of taskQuery.subjects){
+				eqS = "".padStart(10,"-");
+				embed.addField(`${eqS}${ob.name}${eqS}`,`total: ${ob.tasks.length}`, false);
+				for(const task of ob.tasks){
+					console.log(task);
+					//embed.addField(task.dateObj.toLocaleDateString(),task.dscr, true);
+					console.log(task.dscr);
+					embed.addField(`${task.dateObj.getDate()}.${task.dateObj.getMonth()+1} ${edic[task.type]}`,`${task.dscr} ${args.flags.includes("-d")?"\n("+task._id+")":""}`, true);//_id only in debug mode
+				}
+			}
+			
+			return [msg.reply(embed)];
+			/*console.log(result.subjects[0].tasks);
 			console.log("--------\nthe -a tag decides between");
 			console.log(result.subjects.map(x=>x.tasks));
 			console.log("and");
-			console.log(result.subjects.filter(val=>preliminary.map(x=>String(x)).includes(String(val._id))).map(x=>x.tasks));
-			for(const ob of all?result.subjects:result.subjects.filter(val=>preliminary.map(x=>String(x)).includes(String(val._id)))){
+			console.log(result.subjects.filter(val=>preliminary.map(x=>String(x)).includes(String(val._id))).map(x=>x.tasks));*/
+			/*for(const ob of all?result.subjects:result.subjects.filter(val=>preliminary.map(x=>String(x)).includes(String(val._id)))){
 				console.log(ob.name);
 				eqS = "".padStart(10,"-");
 				embed.addField(`${eqS}${ob.name}${eqS}`,`total: ${ob.tasks.length}`, false);
@@ -179,9 +196,12 @@ commandTree = [
 					embed.addField(`${task.dateObj.getDate()}.${task.dateObj.getMonth()+1} ${edic[task.type]}`,`${task.dscr} ${args.flags.includes("-d")?"\n("+task._id+")":""}`, true);//_id only in debug mode
 				}
 			}
+			ams.push(msg.reply(embed));
+			console.log("--");
+			return ams;*/
 			/*console.log(ams);
 			console.log(ams.append);*/
-			ams.push(msg.reply(embed));
+			
 			//console.log(ams);
 			/*const data = [];
 			for(const ob of result.subjects){
@@ -202,10 +222,10 @@ commandTree = [
 				["space"]
 			])+"```");*/
 			//console.log(ams);
-			console.log("--");
+			
 			//console.log(ams);
 			//return ["test","test but 2"];
-			return ams;
+			
 		},
 		help: {
 			dscr:"Lists database entries.",
@@ -264,8 +284,26 @@ commandTree = [
 	{
 		command: "blank",
 		cb: async function(msg,args){
-			await mm.maindb.collection("users").deleteOne({_id:msg.author.id});
-			return [msg.reply("All information we had on you have been deleted. Good Luck out there.")];
+			const servers = (await mm.maindb.collection("users").findOne({_id:msg.author.id},
+			{
+				projection:{
+					"_id":0,
+					"servers":1
+				}
+			})).servers;
+			if(servers){
+				await Promise.all(servers.map(id=>mm.maindb.collection("servers").updateOne({_id:id},{
+					$unset:{
+						"users.$[user].id":""
+					}
+				},
+				{
+					arrayFilters:[{"user.id":msg.author.id}]
+				})));
+				await mm.maindb.collection("users").deleteOne({_id:msg.author.id});
+				return [msg.reply("All information we had on you have been deleted. Good Luck out there.")];
+			}
+			else [msg.reply("No account found with your id, you may be in the clear")];
 		},
 		help:{
 			dscr:"Removes the user profile.\nNote: This doesn't remove the tasks the user has added since we don't track task authors.",
@@ -273,6 +311,18 @@ commandTree = [
 			ex:""//removable
 		},
 		reqReg:true
+	},
+	{
+		command:"test",
+		cb: async function(msg,args){
+			//console.log((await msg.guild.members.fetch()).map(x=>x.user.id));
+			console.log(await msg.guild.members.fetch(msg.author.id));
+			console.log("--------------------------------");
+			console.log(await Promise.all((clint.guilds.cache.map(async guild=> (await guild.members.fetch(msg.author.id)).guild.id))));
+			//console.log(await Promise.all((await clint.guilds.cache.map(guild=>guild.members.fetch(msg.author.id)))));
+			//console.log(await client.guilds.cache.mapmembers.fetch(msg.author.id));
+			return [];
+		}
 	}
 
 ];
@@ -368,34 +418,122 @@ em.on("mongoLoaded", ()=>{
 		}();
 		//console.log("Exiting event handler.")
 	});
-	clint.on("guildCreate", function(guild){
+	clint.on("guildCreate", async function(guild){
 		console.log(`Created guild document entry ${guild.id}`);
-		mm.db.db("freq_access").collection("servers").insertOne({
+		/*const zdusers = await (await guild.members.fetch()).map(x=>({id: x.user.id, subjects:[]}));
+		console.log(zdusers);*/
+		await mm.maindb.collection("servers").insertOne({
 				_id: guild.id,
 				owner: guild.ownerID,
 				joinTime: guild.joinedTimestamp,
 				subjects: [],
 				users: []
+			}
+		);
+		
+		/*mm.maindb.collection("servers").insertOne({
+				_id: guild.id,
+				owner: guild.ownerID,
+				joinTime: guild.joinedTimestamp,
+				subjects: [],
+				users: zdusers
 			},(er,res)=>{
 				if (er){
 					if (er.message.includes("duplicate key")) console.log("the server has already been initiated");
 					else throw er;
 				}
 				else console.log("Server successfully initiated.");
-		});
+		});*/
 	});
 	clint.on("guildDelete", async function(guild){
-		console.log(guild.id);
-		try{
-			await mm.db.db("freq_access").collection("servers").deleteOne({
-				_id: guild.id
-			});
-		}
-		catch(e){
-			if(e) throw e;
-			else console.log(`${guild.id} successfully deleted`);
-		}
+		console.log("delete registered");
+		//console.log(await guild.members.fetch());
+		const server = await mm.maindb.collection("servers").findOne({
+			_id: guild.id
+		},
+		{
+			projection:{
+				_id:0,
+				users:1,
+				subjects:1
+			}
+		});
+		
+		/*for (const guild of await clint.guilds.cache){
+			for(const member of await guild.members.fetch()){
 
+			}
+		}*/
+		if(server.users){
+			for(const userId of server.users){
+				mm.maindb.collection("users").updateOne({
+					_id: userId
+				},
+				{
+					$pull:{
+						subjects:{
+							_id: {
+								$in: server.subjects
+							}
+						}
+					}
+				});
+			}
+			try{
+				await mm.maindb.collection("servers").deleteOne({
+					_id: guild.id
+				});
+			}
+			catch(e){
+				if(e) throw e;
+				else console.log(`${guild.id} successfully deleted`);
+			}
+			console.log("delete finished");
+		}
+		else{
+			console.log("erroccured");
+			console.log(server);
+		} 
+		
+	});
+	clint.on("guildMemberAdd", async function(member){
+		mm.maindb.collection("users").updateOne({
+			_id:member.id
+		},
+		{
+			$push:{
+				servers:member.guild.id
+			}
+		});
+		mm.maindb.collection("servers").updateOne({
+			_id:member.guild.id
+		},
+		{
+			$push:{
+				users:{
+					"id": member.id,
+					"subjects": []
+				}
+			}
+		});
+	});
+	clint.on("guildMemberRemove", async function(member){
+		mm.maindb.collection("users").updateOne({
+			_id:member.id
+		},
+		{
+			$pull:{
+				servers:member.guild.id
+			}
+		});
+		mm.maindb.collection("servers").updateOne({
+			_id:member.guild.id
+		},
+		{
+			$pull:{
+				users: {id: member.id}
+			}
+		});
 	});
 
 	clint.login(process.env.TOKEN);
@@ -410,37 +548,108 @@ async function isRegistered(msg){//untested
 			await mm.maindb.collection("users").insertOne({
 				_id:msg.author.id,
 				preferences:{},
+				servers:[await Promise.all((clint.guilds.cache.map(async guild=> (await guild.members.fetch(msg.author.id)).guild.id)))],
 				subjects:[]
 			});
+			await mm.maindb.collection("servers").updateOne({
+				_id:msg.guild.id
+			},
+			{
+				$push:{
+					users: {
+						_id: msg.author.id,
+						subjects: []
+					}
+				}
+			})
 			msg.reply("Everything should be set up now.");
 			return true;
 		}
 	}
 	else return true;
 }
-function getById(msg){
-	return mm.maindb.collection("servers").findOne({
+async function subber(subject,msg,sub,res){
+	let existsCheck;
+	try{
+		existsCheck = (await mm.maindb.collection("servers").findOne({
 			_id:msg.guild.id,
-			subjects: {$elemMatch: {name: msg.content}}
+			subjects: {$elemMatch: {name:subject}}
 		},
 		{
 			projection:{
-				_id:0,
+				"_id":0,
 				"subjects.$":1
 			}
-	});
-}
-async function subber(msg,sub,res){
-	const o = await getById(msg);
-			console.log(o);
-			const update = {};
-			update[sub] = {subjects:o.subjects[0]._id}
-			if(o){
-				mm.maindb.collection("users").updateOne({
-					_id:msg.author.id
-				},
-				update);
-				if(res)msg.reply(res);
+		}));
+	}
+	catch(e){
+		console.log(e);
+		return [msg.reply("Something went terribly wrong.")];
+	}
+	if(existsCheck instanceof Array) return [msg.reply("the specified subject does not exist")];
+	const update = {
+		
+	};
+	update[sub] = {
+			"users.$[user].subjects": subject
+	};
+	console.log(update);
+	try{
+		if(await mm.maindb.collection("servers").updateOne({
+		_id:msg.guild.id
+		},
+		{
+			$addToSet:{
+				"users.$[user].subjects": subject
 			}
-			else msg.reply("Something went wrong.");
+		},
+		{
+			arrayFilters: [{"user._id":msg.author.id}]
+		}).modifiedCount) return [msg.reply(res)];
+		else return [msg.reply("no modification")];
+		
+	}
+	catch(e){
+		console.log(e);
+		return [msg.reply("Something went terribly wrong.")];
+	}
+	/*try{
+		mm.maindb.collection("servers").updateOne(
+		{
+		'_id': msg.guild.id
+		},
+		[
+			{
+			'$unwind': {
+			'path': '$subjects'
+			}
+		}, {
+			'$match': {
+			'subjects.name': 'MAT'
+			}
+		}, {
+			'$unwind': {
+			'path': '$users'
+			}
+		}, {
+			'$match': {
+			'users._id': '96609466178355200'
+			}
+		}, {
+			'$addFields': {
+			'users.subjects': {
+				'$concatArrays': [
+				'$users.subjects', [
+					'$subjects._id'
+				]
+				]
+			}
+			}
+		}
+		]);
+	}
+	catch(e){
+		throw e;
+	}*/
+	
 }
