@@ -8,6 +8,7 @@ When the bot joins your guild a guild document is automatically created in our d
 Using the bot is relatively simple. If you come upon a task you'd like to add to the bot just use the `!add` command as demonstrated below. If the subject you are requesting doesn't exist you'll be prompted to create it. Next, you'll need to subscribe to it with the `!sub` command. Now you'll be able to see a comprehensive list of your upcoming tasks with the `!list` command. You may want to alter the behaviour of these commands, you can do so by using flags, as shown below.
 
 ## Commands
+*Please note that you can use a mention instead of an exclamation mark, for instance like this `@HWBot list`.*
 |Command|Description|Syntax|Example|Available flags
 |---|---|---|---|---|
 |Add|Adds a task to a subject. Prompts subject creation if subject doesn't exist.|`!add <Subject> <Due date> (<Description> <Due time> <Assignment type>)`|`!add MATH 7.2 22:00 "Finish page 81" hw`|-p

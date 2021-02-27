@@ -348,11 +348,14 @@ em.on("mongoLoaded", ()=>{
 		console.log('Logged in.');
 	});
 	clint.on('message', async function(msg){
-		
-		console.log("command registered".padEnd(25,"_"));
 		if(msg.guild !== null) !async function(){
-			if(!msg.content.startsWith(prefix)) return;//guard clause
-			msg.content = msg.content.replace(prefix, "");
+			if(function(){//new guard clause
+				const tagPref = new RegExp(`^<@.${clint.user.id}> `);
+				if(msg.content.startsWith(prefix)) msg.content = msg.content.replace(prefix, "");
+				else if(tagPref.test(msg.content)) msg.content = msg.content.replace(tagPref,"");
+				else return true;
+			}()) return;
+			console.log("command registered".padEnd(25,"_"));
 			let fired = false;
 			console.log(msg.content.split(" ")[0]);
 			for(const cObj of commandTree) if(msg.content.split(" ")[0] == cObj.command){
