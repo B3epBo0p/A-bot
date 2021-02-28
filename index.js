@@ -373,11 +373,12 @@ em.on("mongoLoaded", ()=>{
 						prefix:1
 					}
 				})).prefix;
-				if(msg.content.startsWith(dbPref||prefix)) msg.content = msg.content.replace(prefix, "");
+				if(msg.content.startsWith(dbPref||prefix)) msg.content = msg.content.replace(dbPref||prefix, "");
 				else if(tagPref.test(msg.content)) msg.content = msg.content.replace(tagPref,"");
 				else return true;
 			}()) return;
 			console.log("command registered".padEnd(25,"_"));
+
 			let fired = false;
 			console.log(msg.content.split(" ")[0]);
 			for(const cObj of commandTree) if(msg.content.split(" ")[0] == cObj.command){
@@ -472,6 +473,9 @@ em.on("mongoLoaded", ()=>{
 					msg.reply("Database entry created, if you'd like to delete this entry, and all the information we have on you use the `blank` command in a guild with this bot. If you got here by trying to use a command that required registration, you'll have to issue it again. Have a nice day.");
 					/*await mm.maindb.collection("servers").updateOne({
 						_id:msg.guild.id
+					},
+					{
+						$push:{
 					},
 					{
 						$push:{
