@@ -245,6 +245,21 @@ commandTree = [
 		reqReg:true
 	},
 	{
+		command: "prefix",
+		cb: async function(msg,args){
+			if((await mm.maindb.collection("servers").updateOne({
+				_id: msg.guild.id
+			},
+			{
+				$set: {
+					prefix: args.prefix
+				}
+			})).modifiedCount) return [msg.reply("Prefix successfully changed.")];
+			else return [msg.reply("Prefix was already in use, or something went wrong")];
+		},
+		reqReg:true
+	},
+	{
 		command:"rm",//subject argument technically unnecessary
 		cb: async function(msg,args){
 			console.log(args);
@@ -349,9 +364,16 @@ em.on("mongoLoaded", ()=>{
 	});
 	clint.on('message', async function(msg){
 		if(msg.guild !== null) !async function(){
-			if(function(){//new guard clause
-				const tagPref = new RegExp(`^<@.${clint.user.id}> `);
-				if(msg.content.startsWith(prefix)) msg.content = msg.content.replace(prefix, "");
+			if(await async function(){//new guard clause
+				const tagPref = new RegExp(`^<@.${clint.user.id}> `),
+				dbPref = (await mm.maindb.collection("servers").findOne({_id:msg.guild.id},
+				{
+					projection:{
+						_id:0,
+						prefix:1
+					}
+				})).prefix;
+				if(msg.content.startsWith(dbPref||prefix)) msg.content = msg.content.replace(prefix, "");
 				else if(tagPref.test(msg.content)) msg.content = msg.content.replace(tagPref,"");
 				else return true;
 			}()) return;
@@ -372,7 +394,8 @@ em.on("mongoLoaded", ()=>{
 							["time", /\d\d?:\d\d?/],
 							["date", /\d\d?\.\d\d?/],
 							["mongoId", /[a-z0-9]{24}/],
-							["flags", /\-[a-z]+/g]
+							["flags", /\-[a-z]+/g],
+							["prefix", /[^A-Za-z0-9 ]+/]
 						];
 						for(const part of msg.content.split('"').entries()){
 							console.log("iteration commenced");

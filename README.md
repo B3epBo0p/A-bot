@@ -16,9 +16,11 @@ Using the bot is relatively simple. If you come upon a task you'd like to add to
 |Desub|Unsubscribes user from the specified subject.|`!desub <Subject>`|`!desub MATH`|-p
 |List|Lists tasks from all the subjects the user is subscribed to.|`!list`|`!list`|-p,-a,-d
 |Rm|Removes task by task ID|`!rm <Task id>`|`!rm 6019da2ab3b7a300b8fd9e87`|-p
+|Prefix|Changes the bots designated prefix|`!prefix <Prefix>`[^1]| `!prefix ?`|-p
 |Src|Links the bots source code|`!src`|`!src`|-p
 |Help|Displays this menu.|`!help`|`!help`|-p
 |Blank|Removes a user profile|`!blank`|`!blank`|-p
+[^1]: Any series of characters that aren't numbers, letters, or spaces.
 
 ## Flags
 You may use flags like this `!list -p -a`.
