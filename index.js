@@ -359,8 +359,34 @@ commandTree = [
 ];
 console.log(em);
 em.on("mongoLoaded", ()=>{
-	clint.on('ready', ()=>{
+	function makeGuildObj(guild){
+		return ({
+				_id: guild.id,
+				owner: guild.ownerID,
+				joinTime: guild.joinedTimestamp,
+				subjects: [],
+				users: []
+			});
+	}
+	clint.on('ready', async function(){
 		console.log('Logged in.');
+		const dbarr = (await mm.maindb.collection("servers").find({},{projection:{_id:1}}).toArray()).map(doc => doc._id).sort(),
+		cgarr = clint.guilds.cache.map(guild => guild.id).sort();//assuming guilds are automatically cached on launch, further testing needed
+		function outer(ar1,ar2){
+			const out = [];
+			for(const id of ar1) if(!ar2.includes(id)) out.push(id);
+			return out;
+		}
+		if((toDel = outer(dbarr,cgarr)).length) await mm.maindb.collection("servers").deleteMany({_id:{$in:toDel}});
+		if((toIns = outer(cgarr,dbarr)).length) await mm.maindb.collection("servers").insertMany(await async function(){
+			const out = [];
+			for(const id of toIns){
+				out.push(makeGuildObj(await clint.guilds.fetch(id)));
+			}
+			console.log(out);
+			return out;
+		}());
+		console.log("Caught up");
 	});
 	clint.on('message', async function(msg){
 		if(msg.guild !== null) !async function(){
@@ -373,12 +399,12 @@ em.on("mongoLoaded", ()=>{
 						prefix:1
 					}
 				})).prefix;
-				if(msg.content.startsWith(dbPref||prefix)) msg.content = msg.content.replace(dbPref||prefix, "");
+				if(msg.content.startsWith(cpref = dbPref||prefix)) msg.content = msg.content.replace(cpref, "");
 				else if(tagPref.test(msg.content)) msg.content = msg.content.replace(tagPref,"");
 				else return true;
 			}()) return;
 			console.log("command registered".padEnd(25,"_"));
-
+			//consol.log(msg.content);
 			let fired = false;
 			console.log(msg.content.split(" ")[0]);
 			for(const cObj of commandTree) if(msg.content.split(" ")[0] == cObj.command){
@@ -491,18 +517,12 @@ em.on("mongoLoaded", ()=>{
 		//console.log("Exiting event handler.")
 	});
 	clint.on("guildCreate", async function(guild){
-		console.log(`Created guild document entry ${guild.id}`);
 		/*const zdusers = await (await guild.members.fetch()).map(x=>({id: x.user.id, subjects:[]}));
 		console.log(zdusers);*/
-		await mm.maindb.collection("servers").insertOne({
-				_id: guild.id,
-				owner: guild.ownerID,
-				joinTime: guild.joinedTimestamp,
-				subjects: [],
-				users: []
-			}
-		);
-		
+		console.log("Bot joined new guild, inserting guild document.")
+		if(!(await mm.maindb.collection("servers").insertOne(makeGuildObj(guild))).insertedCount) console.log("Something went terribliy wrong whilst inserting a guild document.");
+		else console.log("Successfully inserted a guild document.");
+		//console.log(`Created guild document entry ${guild.id}`);
 		/*mm.maindb.collection("servers").insertOne({
 				_id: guild.id,
 				owner: guild.ownerID,
