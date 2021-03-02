@@ -10,7 +10,7 @@ const em = new events.EventEmitter();//oneliner doesn't work here
 
 	this.collections = {};
 
-	this.client.connect(process.env.MANGA, function(err,dbc){
+	this.client.connect(process.env.MANGA, function(err,dbc){	
 		if(err) throw err;
 		console.log("Mongo: connection successful.");
 		this.db = dbc;
@@ -63,8 +63,13 @@ commandTree = [
 					ams.push(reply);
 					await reply.react("✔️");
 					await reply.react("❌");
-					const reactions = await reply.awaitReactions((r)=>r.emoji.name==="✔️"||r.emoji.name==="❌",{max:1,time:7000, erros: ["time"]});
-					if(reactions.total && reactions.first().emoji.name==="✔️" && reactions.first().users.map(user => user.id).includes(msg.author.id)){
+					const reaction = (await reply.awaitReactions((r)=>r.emoji.name==="✔️"||r.emoji.name==="❌",{max:1,time:7000, errors: ["time"]})).first();
+					//console.log(reaction);
+					//console.log(reaction.count);
+					//console.log(reaction.emoji.name);
+					//console.log(reaction.users.cache.map(user => user.id).includes(msg.author.id));
+					if(reaction.count && reaction.emoji.name==="✔️" && reaction.users.cache.map(user => user.id).includes(msg.author.id)){
+						reply.delete();
 						await mm.maindb.collection("servers").updateOne({
 							_id:msg.guild.id
 						},
@@ -78,7 +83,7 @@ commandTree = [
 								}
 							}
 						});
-						return await reply;
+						return await msg.reply("Subject creation and task insertion successful.");
 					}
 					else{
 						reply.delete();
@@ -100,7 +105,7 @@ commandTree = [
 		command:"bug",
 		cb:async function(msg, args){
 			clint.users.cache.get(process.env.AUTHORID).send(`Bug Report.\nFrom:${msg.author.username}, with id of ${msg.author.id}.\n${args.description}`);
-			return [];
+			return [msg.reply("Bug report was successfully submitted.")];
 		},
 		help:{
 			dscr: "Report a bug.",
@@ -168,7 +173,7 @@ commandTree = [
 				"hw": "🥨"
 			},
 			embed = new Ds.MessageEmbed().setTitle(all?"All assignments":"Your assignments:");
-			console.log(qprojection);
+			//console.log(JSON.stringify(qprojection));
 			const taskQuery = await mm.maindb.collection("servers").findOne({
 				_id:msg.guild.id
 			},
@@ -233,7 +238,7 @@ commandTree = [
 				//console.log(ams);
 				//return ["test","test but 2"];
 			}
-			else return [msg.reply("You are not subscribed to any subjects. You can subscribe to subjects via the sub command.")];
+			else return [msg.reply("You are not subscribed to any subjects. You can view subjects you can subscribe to with `list -a`. You can subscribe to subjects via `sub`. You can find out more with `help`.")];
 			
 			
 		},
@@ -247,15 +252,18 @@ commandTree = [
 	{
 		command: "prefix",
 		cb: async function(msg,args){
-			if((await mm.maindb.collection("servers").updateOne({
-				_id: msg.guild.id
-			},
-			{
-				$set: {
-					prefix: args.prefix
-				}
-			})).modifiedCount) return [msg.reply("Prefix successfully changed.")];
-			else return [msg.reply("Prefix was already in use, or something went wrong")];
+			if(args.prefix){
+				if((await mm.maindb.collection("servers").updateOne({
+					_id: msg.guild.id
+				},
+				{
+					$set: {
+						prefix: args.prefix
+					}
+				})).modifiedCount) return [msg.reply("Prefix successfully changed.")];
+				else return [msg.reply("Something went wrong")];
+			}
+			else return [msg.reply("Prefix was already in use.")];
 		},
 		reqReg:true
 	},
@@ -309,6 +317,7 @@ commandTree = [
 	{
 		command: "blank",
 		cb: async function(msg,args){
+			//console.log("blanking started");
 			const servers = (await mm.maindb.collection("users").findOne({_id:msg.author.id},
 			{
 				projection:{
@@ -391,7 +400,9 @@ em.on("mongoLoaded", ()=>{
 	clint.on('message', async function(msg){
 		if(msg.guild !== null) !async function(){
 			if(await async function(){//new guard clause
-				const tagPref = new RegExp(`^<@.${clint.user.id}> `),
+				console.log(msg.content);
+				console.log(clint.user.id);
+				//const tagPref = new RegExp(``),
 				dbPref = (await mm.maindb.collection("servers").findOne({_id:msg.guild.id},
 				{
 					projection:{
@@ -399,9 +410,13 @@ em.on("mongoLoaded", ()=>{
 						prefix:1
 					}
 				})).prefix;
+				/*console.log(tagPref.test(msg.content));
+				console.log(msg.mentions.users.first() == clint.user);*/
 				if(msg.content.startsWith(cpref = dbPref||prefix)) msg.content = msg.content.replace(cpref, "");
-				else if(tagPref.test(msg.content)) msg.content = msg.content.replace(tagPref,"");
+				//else if(tagPref.test(msg.content)) msg.content = msg.content.replace(tagPref,"");
+				else if(msg.mentions.users.first() == clint.user /*&& msg.content.startsWith("<")*/) msg.content = msg.content.replace(/^<@.\d{18}> ?/,"");
 				else return true;
+			//console.log(msg.content);
 			}()) return;
 			console.log("command registered".padEnd(25,"_"));
 			//consol.log(msg.content);
@@ -417,12 +432,12 @@ em.on("mongoLoaded", ()=>{
 					fObj.dateObj.setHours(0,0,0,0);
 					!function(){
 						const queries = [
-							["subject", /[A-Z]{2,5}\d?/],
+							["subject", /\p{Lu}{2,5}\d?/u],
 							["time", /\d\d?:\d\d?/],
 							["date", /\d\d?\.\d\d?/],
 							["mongoId", /[a-z0-9]{24}/],
 							["flags", /\-[a-z]+/g],
-							["prefix", /[^A-Za-z0-9 ]+/]
+							["prefix", /[^\p{L}0-9 ]+/u]
 						];
 						for(const part of msg.content.split('"').entries()){
 							console.log("iteration commenced");
@@ -490,11 +505,20 @@ em.on("mongoLoaded", ()=>{
 			//if(msg.content == "I have read and understood the above specified Terms of Service and Privacy Policy")
 			if(msg.content == "I have read and understood the above specified Terms of Service and Privacy Policy"){
 				const prev = (await msg.channel.messages.fetch({limit:2})).last();
+				//console.log("Before author check");
 				if(prev.author.id == clint.user.id && prev.content.includes("https://bit.ly/3nC06gH")){
 					await mm.maindb.collection("users").insertOne({
 						_id:msg.author.id,
 						preferences:{},
-						servers:await Promise.all((clint.guilds.cache.map(async guild=> (await guild.members.fetch(msg.author.id)).guild.id)))
+						servers:(await Promise.all(clint.guilds.cache.map(async guild=> {
+							try{
+								await guild.members.fetch(msg.author);
+								return guild.id;
+							}
+							catch(e){
+								if(e.message!="Unknown Member") throw e;
+							}
+						}))).filter(x=>x)
 					});
 					msg.reply("Database entry created, if you'd like to delete this entry, and all the information we have on you use the `blank` command in a guild with this bot. If you got here by trying to use a command that required registration, you'll have to issue it again. Have a nice day.");
 					/*await mm.maindb.collection("servers").updateOne({
@@ -710,7 +734,8 @@ async function subber(subject,msg,sub,res){
 		console.log(e);
 		return [msg.reply("Something went terribly wrong.")];
 	}
-	if(existsCheck instanceof Array) return [msg.reply("the specified subject does not exist")];
+	console.log(existsCheck);
+	if(existsCheck instanceof Array || !existsCheck) return [msg.reply("the specified subject does not exist.")];
 	const update = {
 		
 	};

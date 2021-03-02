@@ -34,6 +34,7 @@ While using the bot you'll encounter commands which require registration with th
 
 ### Arguments
 Some arguments need to fulfill specific criteria to be recognized.
+*Note: The subject argument supports unicode characters.*
 |Argument type|Requirement|
 |---|---|
 |Subject|2 to 5 capital letters, that can be followed by a number.
